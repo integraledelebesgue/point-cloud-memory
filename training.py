@@ -39,7 +39,6 @@ def train(
         for point_cloud in tqdm.tqdm(data_loader_train, desc=f"Training [{epoch + 1}/{num_epochs}]"):
             point_cloud = point_cloud.to(device)
             point_cloud_reconstructed = model.forward(point_cloud)
-
             loss, _ = chamfer_distance(point_cloud, point_cloud_reconstructed)
             loss.backward()
             epoch_loss_total += loss.mean().detach().cpu().item()

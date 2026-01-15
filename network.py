@@ -1,5 +1,96 @@
 import hflayers
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class PointNetEncoder(nn.Module):
+    def __init__(self, latent_dim=1024):
+        super(PointNetEncoder, self).__init__()
+        # Shared MLP: [64, 128, 128, 256, 1024]
+        self.conv1 = nn.Conv1d(3, 64, 1)
+        self.conv2 = nn.Conv1d(64, 128, 1)
+        self.conv3 = nn.Conv1d(128, 128, 1)
+        self.conv4 = nn.Conv1d(128, 256, 1)
+        self.conv5 = nn.Conv1d(256, latent_dim, 1)
+
+        self.bn1 = nn.BatchNorm1d(64)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.bn3 = nn.BatchNorm1d(128)
+        self.bn4 = nn.BatchNorm1d(256)
+        self.bn5 = nn.BatchNorm1d(latent_dim)
+
+    def forward(self, x):
+        # Input x shape: (B, 3, N)
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = F.relu(self.bn4(self.conv4(x)))
+        x = F.relu(self.bn5(self.conv5(x)))
+
+        # Global Max Pooling
+        x = x.amax(dim=2)
+        return x
+
+
+class UpConvDecoder(nn.Module):
+    def __init__(self, latent_dim=1024, num_points=2048):
+        super(UpConvDecoder, self).__init__()
+        self.num_points = num_points
+
+        # Initial projection to a 4x4 spatial grid
+        self.fc1 = nn.Linear(latent_dim, 1024)
+        self.fc2 = nn.Linear(1024, 256 * 4 * 4)
+
+        self.bn_fc1 = nn.BatchNorm1d(1024)
+        self.bn_fc2 = nn.BatchNorm1d(256 * 4 * 4)
+
+        # Transposed convolutions to upsample the grid
+        # (B, 256, 4, 4) -> (B, 128, 8, 8)
+        self.deconv1 = nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1)
+        # (B, 128, 8, 8) -> (B, 64, 16, 16)
+        self.deconv2 = nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1)
+        # (B, 64, 16, 16) -> (B, 32, 32, 32)
+        self.deconv3 = nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1)
+        # (B, 32, 32, 32) -> (B, 3, 64, 64)
+        self.deconv4 = nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1)
+
+        self.bn1 = nn.BatchNorm2d(128)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.bn3 = nn.BatchNorm2d(32)
+
+    def forward(self, z):
+        # (B, 1024) -> (B, 4096)
+        x = F.relu(self.bn_fc1(self.fc1(z)))
+        x = F.relu(self.bn_fc2(self.fc2(x)))
+
+        # Reshape to spatial grid: (Batch, Channels, Height, Width)
+        x = x.view(-1, 256, 4, 4)
+
+        # Upsampling layers
+        x = F.relu(self.bn1(self.deconv1(x)))
+        x = F.relu(self.bn2(self.deconv2(x)))
+        x = F.relu(self.bn3(self.deconv3(x)))
+
+        # Final layer (usually no activation or Tanh depending on data normalization)
+        x = self.deconv4(x)  # Shape: (B, 3, 64, 64)
+
+        # Reshape to (B, 3, 4096) and take the first num_points
+        x = x.view(-1, 3, 64 * 64)
+        return x[:, :, : self.num_points]
+
+
+class PointNetAE(nn.Module):
+    def __init__(self, latent_dim, num_points=2048):
+        super().__init__()
+        self.encoder = PointNetEncoder(latent_dim=latent_dim)
+        self.decoder = UpConvDecoder(latent_dim=latent_dim, num_points=num_points)
+
+    def forward(self, x):
+        # x: (B, 3, N)
+        z = self.encoder(x)
+        reconstruction = self.decoder(z)
+        return reconstruction
 
 
 class PointCloudVAE(torch.nn.Module):

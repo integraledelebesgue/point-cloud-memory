@@ -6,9 +6,9 @@ from loguru import logger
 
 import training
 from dataset import YCBDataset
-from network import PointCloudVAE
+from network import PointNetAE
 
-NUM_POINTS = 100_000
+NUM_POINTS = 4096
 LATENT_DIMENSION = 32
 
 BATCH_SIZE = 8
@@ -27,7 +27,7 @@ def train(num_epochs: int, learning_rate: float, batch_size: int, name: str, tor
     data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=batch_size)
 
     device = torch.device(torch_device)
-    model = PointCloudVAE(num_points=NUM_POINTS, latent_dimension=LATENT_DIMENSION).to(device)
+    model = PointNetAE(latent_dim=LATENT_DIMENSION, num_points=NUM_POINTS).to(device)
 
     logger.info(
         f"Loaded {len(dataset)} examples (training: {len(dataset_train)}, validation {len(dataset_valid)}, test: {len(dataset_test)})"
