@@ -2,12 +2,12 @@ import torch
 import tqdm
 from pytorch3d.loss.chamfer import chamfer_distance
 
-from network import PointCloudVAE
+from network import PointCloudMemory, PointCloudVAE
 
 
 @torch.inference_mode()
 def evaluate(
-    model: PointCloudVAE,
+    model: PointCloudMemory | PointCloudVAE,
     data_loader: torch.utils.data.DataLoader,
     device: torch.device,
 ) -> float:
@@ -24,7 +24,7 @@ def evaluate(
 
 
 def train(
-    model: PointCloudVAE,
+    model: PointCloudMemory | PointCloudVAE,
     data_loader_train: torch.utils.data.DataLoader,
     data_loader_valid: torch.utils.data.DataLoader,
     num_epochs: int,

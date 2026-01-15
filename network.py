@@ -1,3 +1,4 @@
+import hflayers
 import torch
 
 
@@ -107,3 +108,38 @@ class Decoder(torch.nn.Module):
         x = self.conv1_transpose.forward(x)
 
         return x
+
+
+class PointCloudMemory(torch.nn.Module):
+    def __init__(self, num_points: int, latent_dimension: int) -> None:
+        super().__init__()
+
+        self.num_points = num_points
+        self.latent_dimension = latent_dimension
+
+        self.encoder = Encoder(num_points, 2 * latent_dimension)
+        self.hopfield_layer = hflayers.Hopfield(latent_dimension)
+        self.decoder = Decoder(num_points, latent_dimension)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        parameters, max_pool_indices = self.encoder.forward(x)
+
+        match x.shape:
+            case 3, _:
+                mean = parameters[: self.latent_dimension]
+                std_dev = parameters[self.latent_dimension :]
+                white_noise = torch.randn(self.latent_dimension, device=x.device)
+
+            case batch_size, 3, _:
+                mean = parameters[:, : self.latent_dimension]
+                std_dev = parameters[:, self.latent_dimension :]
+                white_noise = torch.randn(batch_size, self.latent_dimension, device=x.device)
+
+            case _:
+                raise
+
+        embedding = mean + std_dev * white_noise
+        embedding_associated = self.hopfield_layer.forward(embedding.unsqueeze(-2)).squeeze(-2)
+        out = self.decoder.forward(embedding_associated, max_pool_indices)
+
+        return out
