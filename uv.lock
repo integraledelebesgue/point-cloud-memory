@@ -235,6 +235,15 @@ wheels = [
 ]
 
 [[package]]
+name = "hopfield-layers"
+version = "1.0.2"
+source = { git = "https://github.com/ml-jku/hopfield-layers.git#f56f929c95b77a070ae675ea4f56b6d54d36e730" }
+dependencies = [
+    { name = "numpy" },
+    { name = "torch" },
+]
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -935,6 +944,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "einops" },
     { name = "h5py" },
+    { name = "hopfield-layers" },
     { name = "imageio" },
     { name = "loguru" },
     { name = "numpy" },
@@ -956,6 +966,7 @@ dev = [
 requires-dist = [
     { name = "einops", specifier = ">=0.8.1" },
     { name = "h5py", specifier = ">=3.15.1" },
+    { name = "hopfield-layers", git = "https://github.com/ml-jku/hopfield-layers.git" },
     { name = "imageio", specifier = ">=2.37.2" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "numpy", specifier = ">=2.3.5" },
