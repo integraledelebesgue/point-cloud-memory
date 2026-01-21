@@ -1,4 +1,4 @@
-from . import metrics
+from . import hopfield, metrics
 from .loop import evaluate, train
 
-__all__ = ["metrics", "evaluate", "train"]
+__all__ = ["hopfield", "metrics", "evaluate", "train"]
