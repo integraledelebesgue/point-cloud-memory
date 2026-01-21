@@ -1,4 +1,5 @@
 import pathlib
+import typing
 
 import pyminiply
 import torch
@@ -59,6 +60,54 @@ class YCBDataset(torch.utils.data.Dataset):
 
     def __len__(self) -> int:
         return len(self.point_clouds)
+
+
+def mask_random_patch(point_cloud: torch.Tensor, num_neighbors: int) -> torch.Tensor:
+    num_points = point_cloud.size(1)
+
+    seed_index = torch.randint(0, num_points, (1,))
+    seed = point_cloud[:, seed_index]
+
+    distance = (point_cloud - seed).pow(2).sum(dim=0)
+    _, patch_indices = torch.topk(distance, num_neighbors, largest=False)
+
+    masked_cloud = point_cloud.clone()
+    masked_cloud[:, patch_indices] = point_cloud[:, 0].unsqueeze(1)
+
+    return masked_cloud
+
+
+def generate_bag(point_cloud: torch.Tensor, bag_size: int, drop_ratio: float) -> torch.Tensor:
+    num_points = point_cloud.size(1)
+    patch_size = int(num_points * drop_ratio)
+    masked_clouds = [point_cloud]
+
+    for _ in range(bag_size - 1):
+        point_cloud_masked = mask_random_patch(point_cloud, patch_size)
+        masked_clouds.append(point_cloud_masked)
+
+    return torch.stack(masked_clouds)
+
+
+class Bag(typing.TypedDict):
+    point_cloud_original: torch.Tensor
+    point_clouds_masked: torch.Tensor
+
+
+class MaskedBagsDataset(torch.utils.data.Dataset):
+    point_cloud_bags: list[Bag]
+
+    def __init__(self, base_dataset: torch.utils.data.Dataset, num_points: int, bag_size: int, drop_ratio: float) -> None:
+        self.point_cloud_bags = [
+            {"point_cloud_original": point_cloud, "point_clouds_masked": generate_bag(point_cloud, bag_size, drop_ratio)}
+            for point_cloud in iter(base_dataset)
+        ]
+
+    def __getitem__(self, index: int) -> Bag:
+        return self.point_cloud_bags[index]
+
+    def __len__(self) -> int:
+        return len(self.point_cloud_bags)
 
 
 class GeometricShapesDataset(torch.utils.data.Dataset):
